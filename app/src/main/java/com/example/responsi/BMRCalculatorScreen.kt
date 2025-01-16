@@ -5,14 +5,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 
 @Composable
 fun BMRCalculatorScreen(navController: NavHostController) {
+    var name by remember { mutableStateOf("") }
     var age by remember { mutableStateOf("") }
     var weight by remember { mutableStateOf("") }
     var height by remember { mutableStateOf("") }
@@ -33,7 +34,14 @@ fun BMRCalculatorScreen(navController: NavHostController) {
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
-        // Input untuk Usia, Berat Badan, dan Tinggi Badan
+        // Input untuk Nama, Usia, Berat Badan, dan Tinggi Badan
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Nama") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
         OutlinedTextField(
             value = age,
             onValueChange = { age = it },
@@ -80,10 +88,10 @@ fun BMRCalculatorScreen(navController: NavHostController) {
         // Tombol untuk menghitung BMR
         Button(
             onClick = {
-                if (age.isNotEmpty() && weight.isNotEmpty() && height.isNotEmpty()) {
+                if (name.isNotEmpty() && age.isNotEmpty() && weight.isNotEmpty() && height.isNotEmpty()) {
                     bmr = calculateBMR(age.toInt(), weight.toFloat(), height.toFloat(), gender)
                     // Simpan data dan pindah ke halaman UserData
-                    saveUserBMRData(context, "Username", bmr) // Ganti "Username" dengan input user jika diperlukan
+                    saveUserBMRData(context, name, age.toInt(), weight.toFloat(), height.toFloat(), bmr)
                     navController.navigate("user_data")
                 }
             },
@@ -111,17 +119,27 @@ fun calculateBMR(age: Int, weight: Float, height: Float, gender: String): Float 
     }
 }
 
-fun saveUserBMRData(context: Context, username: String, bmr: Float) {
+fun saveUserBMRData(context: Context, name: String, age: Int, weight: Float, height: Float, bmr: Float) {
     val sharedPreferences = context.getSharedPreferences("UserData", Context.MODE_PRIVATE)
-    with(sharedPreferences.edit()) {
-        putString("username", username)
-        putFloat("bmr", bmr)
-        apply()
-    }
+    val editor = sharedPreferences.edit()
+    val userData = getUserData(context).toMutableList()
+    userData.add(UserData(name, age, weight, height, bmr))
+    // Save the list of user data
+    editor.putString("userData", userData.joinToString(",") { "${it.name}|${it.age}|${it.weight}|${it.height}|${it.bmr}" })
+    editor.apply()
 }
 
-@Preview(showBackground = true)
-@Composable
-fun PreviewBMRCalculatorScreen() {
-    BMRCalculatorScreen(navController = NavHostController(LocalContext.current))
+data class UserData(val name: String, val age: Int, val weight: Float, val height: Float, val bmr: Float)
+
+fun getUserData(context: Context): List<UserData> {
+    val sharedPreferences = context.getSharedPreferences("UserData", Context.MODE_PRIVATE)
+    val userDataString = sharedPreferences.getString("userData", "") ?: ""
+    return userDataString.split(",").mapNotNull {
+        val parts = it.split("|")
+        if (parts.size == 5) {
+            UserData(parts[0], parts[1].toInt(), parts[2].toFloat(), parts[3].toFloat(), parts[4].toFloat())
+        } else {
+            null
+        }
+    }
 }
